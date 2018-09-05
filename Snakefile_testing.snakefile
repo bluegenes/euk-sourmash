@@ -9,13 +9,15 @@ NAMES ={}
 DATADIR = "data"
 
 rule all:
-    input: expand('trees/{subsetparam}/{subsetparam}-k{ksize}.sbt.json', subsetparam=SUBSETS, ksize=[21, 31, 51])
+    input: 
+        # dynamic(expand("data/genbank/{subset}/{{id}}/{{name}}_rm.out.gz", subset=SUBSETS)),
+        dynamic(expand("data/sigs/{subset}/{{id}}/{{name}}.sig", subset = SUBSETS))
 
 rule download_ncbi_genomes:
     params: 
         sub = SUBSETS,
         out = "data"
-    output: dynamic("data/genbank/fungi/{id}/{id}_{name}_rm.out.gz")
+    output: dynamic("data/genbank/{subset}/{id}/{name}_rm.out.gz")
     conda: "envs/env.yml"
     shell: """
            touch {output}
@@ -23,19 +25,19 @@ rule download_ncbi_genomes:
            """
 
 rule compute_sigs:
-    input: "data/genbank/fungi/{id}/{id}_{name}_rm.out.gz"
-    output: "data/sigs/fungi/{id}_{name}.sig"
+    input: "data/genbank/{subset}/{id}/{name}_rm.out.gz"
+    output: "data/sigs/{subset}/{id}/{name}.sig"
     conda: "envs/env.yml"
     shell:'''
         sourmash compute -k 21,31,51 --scaled 1000 --track-abundance --name-from-first -o {output} {input}
     '''
  
 rule index_sigs:
-    output: 'trees/{subsetparam}/{subsetparam}-k{ksize}.sbt.json'
-    input: dynamic("data/sigs/fungi/{id}_{name}.sig") 
+    output: 'trees/{subset}/{subset}-k{ksize}.sbt.json'
+    input: dynamic("data/sigs/{subset}/{name}.sig") 
     params:
         ksize="{ksize}",
-        subset="{subsetparam}"
+        subset="{subset}"
     conda: "envs/env.yml"
     shell: """
         sourmash index -k {params.ksize} \
