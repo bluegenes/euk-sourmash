@@ -10,22 +10,43 @@ DATADIR = "data"
 
 rule all:
     input: 
-        # dynamic(expand("data/genbank/{subset}/{{id}}/{{name}}_rm.out.gz", subset=SUBSETS)),
-        dynamic(expand("data/sigs/{subset}/{{id}}/{{name}}.sig", subset = SUBSETS))
+        #dynamic(expand("data/genbank/{subset}/{{id}}/{{name}}_rm.out.gz", subset=SUBSETS)),
+        #dynamic(expand("data/genbank/{subset}/{{id}}/{{name}}_genomic.fna.gz", subset=SUBSETS)),
+        #dynamic(expand("data/sigs/{subset}/{{id}}/{{name}}.sig", subset = SUBSETS))
+        dynamic(expand("data/rm_bed/{subset}/{{id}}/{{name}}_rm.out.bed", subset = SUBSETS))
 
 rule download_ncbi_genomes:
     params: 
         sub = SUBSETS,
         out = "data"
-    output: dynamic("data/genbank/{subset}/{id}/{name}_rm.out.gz")
+    output: 
+        dynamic("data/genbank/{subset}/{id}/{name}_rm.out.gz"),
+        dynamic("data/genbank/{subset}/{id}/{name}_genomic.fna.gz"),
     conda: "envs/env.yml"
     shell: """
-           touch {output}
-           #ncbi-genome-download -o {params.out} -s genbank -v -F rm fungi
+           ncbi-genome-download -o {params.out} -s genbank -v -F rm,fasta {params.sub}
            """
 
+rule convert_out:
+    input: "data/genbank/{subset}/{id}/{name}_rm.out.gz",
+    output: "data/rm_bed/{subset}/{id}/{name}_rm.out.bed"
+    conda: "envs/env.yml"
+    shell:"""
+    gunzip -c {input} | rmsk2bed > {output}
+    """
+
+rule mask_genomes:
+    input: 
+        rm = "data/rm_bed/{subset}/{id}/{name}_rm.out.bed",
+        genome = "data/genbank/{subset}/{id}/{name}_genomic.fna.gz"
+    output: "data/masked/{subset}/{id}/{name}_masked.fna.gz"
+    conda: "envs/env.yml"
+    shell:'''
+    bedtools maskfasta -fi {input.genome} -bed {input.rm} -fo {output}
+    '''
+
 rule compute_sigs:
-    input: "data/genbank/{subset}/{id}/{name}_rm.out.gz"
+    input: "data/genbank/{subset}/{id}/{name}_masked.fna.gz"
     output: "data/sigs/{subset}/{id}/{name}.sig"
     conda: "envs/env.yml"
     shell:'''
