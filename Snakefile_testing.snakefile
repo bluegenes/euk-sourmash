@@ -12,8 +12,8 @@ rule all:
     input: 
         #dynamic(expand("data/genbank/{subset}/{{id}}/{{name}}_rm.out.gz", subset=SUBSETS)),
         #dynamic(expand("data/genbank/{subset}/{{id}}/{{name}}_genomic.fna.gz", subset=SUBSETS)),
-        #dynamic(expand("data/sigs/{subset}/{{id}}/{{name}}.sig", subset = SUBSETS))
-        dynamic(expand("data/rm_bed/{subset}/{{id}}/{{name}}_rm.out.bed", subset = SUBSETS))
+        dynamic(expand("data/sigs/{subset}/{{id}}/{{name}}.sig", subset = SUBSETS))
+        #dynamic(expand("data/rm_bed/{subset}/{{id}}/{{name}}_rm.out.bed", subset = SUBSETS))
 
 rule download_ncbi_genomes:
     params: 
@@ -35,18 +35,32 @@ rule convert_out:
     gunzip -c {input} | rmsk2bed > {output}
     """
 
+rule cut_to_bed:
+    input: "data/rm_bed/{subset}/{id}/{name}_rm.out.bed"
+    output: "data/rm_bed/{subset}/{id}/{name}_rm.out.bed.cut"
+    shell:"""
+    cut -f1,2,3 {input} > {output}    
+    """
+
+rule unzip_genomes:
+    input: "data/genbank/{subset}/{id}/{name}_genomic.fna.gz"
+    output: "data/genbank/{subset}/{id}/{name}_genomic.fna"
+    shell:"""
+    gunzip {input}
+    """
+
 rule mask_genomes:
     input: 
-        rm = "data/rm_bed/{subset}/{id}/{name}_rm.out.bed",
-        genome = "data/genbank/{subset}/{id}/{name}_genomic.fna.gz"
-    output: "data/masked/{subset}/{id}/{name}_masked.fna.gz"
+        rm = "data/rm_bed/{subset}/{id}/{name}_rm.out.bed.cut",
+        genome = "data/genbank/{subset}/{id}/{name}_genomic.fna"
+    output: "data/masked/{subset}/{id}/{name}_masked.fna"
     conda: "envs/env.yml"
     shell:'''
     bedtools maskfasta -fi {input.genome} -bed {input.rm} -fo {output}
     '''
 
 rule compute_sigs:
-    input: "data/genbank/{subset}/{id}/{name}_masked.fna.gz"
+    input: "data/masked/{subset}/{id}/{name}_masked.fna"
     output: "data/sigs/{subset}/{id}/{name}.sig"
     conda: "envs/env.yml"
     shell:'''
