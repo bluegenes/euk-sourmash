@@ -2,16 +2,16 @@ import glob
 import os
 
 
-SUBSETS = ['fungi','plant','invertebrate','vertebrate_mammalian', 'vertebrate_other']
+SUBSETS = ['fungi', 'archaea', 'protozoa', 'plant','invertebrate','vertebrate_mammalian', 'vertebrate_other', 'bacteria', 'viral']
 INPUTS = {}
 NAMES ={}
 
-DATADIR = "/data/genbank"
-OUTDIR = "/Users/taylorreiter/euk_sbts"
+DATADIR = "genbank"
+OUTDIR = ""
 
 for subset in SUBSETS:
-    INPUTS[subset] = glob.glob(os.path.join(DATADIR, subset,"*/*.fna.gz"))
-    NAMES[subset] = [os.path.basename(f).split('_genomic.fna.gz')[0] for f in INPUTS[subset] if '_rna_from_genomic' not in f]
+    INPUTS[subset] = glob.glob(os.path.join(DATADIR, subset,"*/*_rna_from_genomic.fna.gz"))
+    NAMES[subset] = [os.path.basename(f).split('_rna_from_genomic.fna.gz')[0] for f in INPUTS[subset]] #if '_rna_from_genomic' not in f]
 
 rule all:
     input:
@@ -20,7 +20,7 @@ rule all:
                ksize=[21, 31, 51])
 
 rule compute_sigs:
-    input: os.path.join(DATADIR,'{subset}/{id}/{id}_{name}_genomic.fna.gz')
+    input: os.path.join(DATADIR,'{subset}/{id}/{id}_{name}_rna_from_genomic.fna.gz')
     output: os.path.join(OUTDIR, 'sigs/{subset}/{id}_{name}.sig')
     wildcard_constraints:
         id="\w+_\d+\.\d+"
