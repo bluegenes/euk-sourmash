@@ -1,23 +1,18 @@
 import glob
 import os
-import pandas as pd
+import re
 
 
-SUBSETS = ['fungi'] # 'archaea', 'protozoa', 'plant','invertebrate','vertebrate_mammalian', 'vertebrate_other', 'bacteria', 'viral']
+SUBSETS = ['archaea'] # 'fungi', 'protozoa', 'plant','invertebrate','vertebrate_mammalian', 'vertebrate_other', 'bacteria', 'viral']
 INPUTS = {}
 NAMES ={}
 
 DATADIR = "genbank"
 OUTDIR = ""
-METADATA = {}
 
 for subset in SUBSETS:
     INPUTS[subset] = glob.glob(os.path.join(DATADIR, subset,"*/*_rna_from_genomic.fna.gz"))
     NAMES[subset] = [os.path.basename(f).split('_rna_from_genomic.fna.gz')[0] for f in INPUTS[subset]] #if '_rna_from_genomic' not in f]
-
-for subset in SUBSETS:
-    METADATA[subset] = (pd.read_table('{}-metadata.tab'.format(subset))
-                          .set_index('assembly_accession'))
 
 rule all:
     input:
@@ -26,15 +21,25 @@ rule all:
                ksize=[21, 31, 51])
 
 def generate_sig_name(w):
-    metadata = METADATA[subset].loc[w.id]
-    return "{} {}".format(metadata[w.id], metadata['organism_name']) 
-
+    file_name = os.path.join(DATADIR, '{w.subset}/{w.id}/{w.id}_{w.name}_assembly_report.txt')
+    with open(file_name, 'r') as f:
+        for i, line in enumerate(f):
+            if i == 0:
+                accession = line.strip()
+                accession = re.sub("# Assembly name: ", "", accession)
+            if i == 1:
+                organism = line.strip()
+                organism = re.sub("# Organism name: ", "", organism)
+    return "{} {}".format(accession, organism)
+ 
 rule compute_sigs:
     input: os.path.join(DATADIR,'{subset}/{id}/{id}_{name}_rna_from_genomic.fna.gz')
     output: os.path.join(OUTDIR, 'sigs/{subset}/{id}_{name}.sig')
     params:
         id="{id}",
-        name=generate_sig_name
+        subset = "{subset}",
+        name="{name}",
+        sig_name=generate_sig_name
     wildcard_constraints:
         id="\w+_\d+\.\d+"
     conda: "envs/env.yml"
@@ -42,7 +47,7 @@ rule compute_sigs:
         sourmash compute -k 21,31,51 \
                          --scaled 1000 \
                          --track-abundance \
-                         --merge {params.name:q} \
+                         --merge {params.sig_name:q} \
                          -o {output} \
                          {input}
     """
