@@ -3,7 +3,7 @@ import os
 import re
 
 
-SUBSETS = ['archaea'] # 'fungi', 'protozoa', 'plant','invertebrate','vertebrate_mammalian', 'vertebrate_other', 'bacteria', 'viral']
+SUBSETS = ['archaea', 'fungi', 'protozoa', 'plant','invertebrate','vertebrate_mammalian', 'vertebrate_other'] #, 'bacteria', 'viral']
 INPUTS = {}
 NAMES ={}
 
@@ -21,17 +21,32 @@ rule all:
                ksize=[21, 31, 51])
 
 def generate_sig_name(w):
-    file_name = os.path.join(DATADIR, '{w.subset}/{w.id}/{w.id}_{w.name}_assembly_report.txt')
-    with open(file_name, 'r') as f:
-        for i, line in enumerate(f):
-            if i == 0:
-                accession = line.strip()
-                accession = re.sub("# Assembly name: ", "", accession)
-            if i == 1:
-                organism = line.strip()
-                organism = re.sub("# Organism name: ", "", organism)
-    return "{} {}".format(accession, organism)
- 
+    file_name = os.path.join(DATADIR, f'{w.subset}/{w.id}/{w.id}_{w.name}_assembly_report.txt')
+    #import pdb;pdb.set_trace()
+    if os.path.isfile(file_name):
+        with open(file_name, 'r') as f:
+            for i, line in enumerate(f):
+                if i == 0:
+                    accession = line.strip()
+                    accession = re.sub("# Assembly name: ", "", accession)
+                if i == 1:
+                    organism = line.strip()
+                    organism = re.sub("# Organism name: ", "", organism)
+        return "{} {}".format(accession, organism)
+    else:
+        path = os.path.join(DATADIR, f'{w.subset}/{w.id}/*assembly_report.txt')
+        for file_name in glob.glob(path):
+            with open(file_name, 'r') as f:
+                for i, line in enumerate(f):
+                    if i == 0:
+                        accession = line.strip()
+                        accession = re.sub("# Assembly name: ", "", accession)
+                    if i == 1:
+                        organism = line.strip()
+                        organism = re.sub("# Organism name: ", "", organism)
+            return "{} {}".format(accession, organism)
+
+
 rule compute_sigs:
     input: os.path.join(DATADIR,'{subset}/{id}/{id}_{name}_rna_from_genomic.fna.gz')
     output: os.path.join(OUTDIR, 'sigs/{subset}/{id}_{name}.sig')
